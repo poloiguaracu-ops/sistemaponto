@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS employees(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,cpf TEXT NOT NULL UNIQUE,role TEXT NOT NULL DEFAULT 'employee',active INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS punches(id INTEGER PRIMARY KEY AUTOINCREMENT,employee_id INTEGER NOT NULL,type TEXT NOT NULL CHECK(type IN ('entrada','intervalo','retorno','saida')),recorded_at TEXT NOT NULL,ip TEXT,FOREIGN KEY(employee_id) REFERENCES employees(id));
+CREATE TABLE IF NOT EXISTS justifications(id INTEGER PRIMARY KEY AUTOINCREMENT,employee_id INTEGER NOT NULL,date TEXT NOT NULL,category TEXT NOT NULL,description TEXT NOT NULL,document_name TEXT,document_data TEXT,status TEXT NOT NULL DEFAULT 'Pendente',created_at TEXT NOT NULL,reviewed_at TEXT,reviewer_id INTEGER,FOREIGN KEY(employee_id) REFERENCES employees(id));
+CREATE INDEX IF NOT EXISTS idx_punches_employee_date ON punches(employee_id,recorded_at);
+CREATE INDEX IF NOT EXISTS idx_just_employee_date ON justifications(employee_id,date);
