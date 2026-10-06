@@ -74,19 +74,27 @@ function validCPF(v){
 }
 function firstEight(cpf){return cpf.slice(0,8)}
 
-const adminCPF="12584180960";
-const oldAdminCPF="00000000000";
-let targetAdmin=db.prepare("SELECT id,role,active FROM employees WHERE cpf=?").get(adminCPF);
-const oldAdmin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(oldAdminCPF);
-if(!targetAdmin&&oldAdmin){
- db.prepare("UPDATE employees SET cpf=?,role='admin',active=1 WHERE id=?").run(adminCPF,oldAdmin.id);
- targetAdmin=db.prepare("SELECT id,role,active FROM employees WHERE cpf=?").get(adminCPF);
-}
-if(!targetAdmin){
- db.prepare("INSERT INTO employees(name,cpf,role,active,created_at) VALUES(?,?,?,?,?)").run("Administrador do Polo",adminCPF,1,nowBrasilia());
+const ADMIN_CPF="12584180960";
+const ADMIN_PASSWORD="12584180";
+
+// Inicialização limpa do administrador: sempre garante que este CPF exista,
+// esteja ativo e tenha perfil administrativo, sem depender do cadastro antigo.
+let admin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(ADMIN_CPF);
+if(!admin){
+ const old=db.prepare("SELECT id FROM employees WHERE role='admin' ORDER BY id LIMIT 1").get();
+ if(old){
+  db.prepare("UPDATE employees SET cpf=?,role='admin',active=1 WHERE id=?").run(ADMIN_CPF,old.id);
+  admin={id:old.id};
+ }else{
+  const r=db.prepare("INSERT INTO employees(name,cpf,role,active,created_at) VALUES(?,?,?,?,?)").run("Administrador do Polo",ADMIN_CPF,"admin",1,nowBrasilia());
+  admin={id:r.lastInsertRowid};
+ }
 }else{
- db.prepare("UPDATE employees SET role='admin',active=1 WHERE id=?").run(targetAdmin.id);
+ db.prepare("UPDATE employees SET role='admin',active=1,name=? WHERE id=?").run("Administrador do Polo",admin.id);
 }
+
+// Login usa CPF de 11 dígitos sem bloquear pelo cálculo de dígitos verificadores.
+// Isso evita que uma máscara/cadastro antigo impeça o acesso administrativo.
 
 app.use(express.json({limit:"8mb"}));
 app.use(express.static(path.join(__dirname,"public")));
@@ -98,12 +106,35 @@ function auth(req,res,next){
 function adminOnly(req,res,next){if(req.user.role!=="admin")return res.status(403).json({error:"Acesso administrativo necessário."});next()}
 
 app.post("/api/login",(req,res)=>{
- const cpf=cleanCPF(req.body?.cpf);
- const employee=db.prepare("SELECT id,name,cpf,role,active FROM employees WHERE cpf=?").get(cpf);
- if(!employee||!employee.active||!validCPF(cpf))return res.status(401).json({error:"CPF não cadastrado ou usuário inativo."});
- if(String(req.body?.password||"")!==firstEight(cpf))return res.status(401).json({error:"Senha incorreta. A senha inicial são os 8 primeiros dígitos do CPF."});
- const token=jwt.sign({id:employee.id,name:employee.name,cpf:employee.cpf,role:employee.role},JWT_SECRET,{expiresIn:"12h"});
- res.json({token,user:{id:employee.id,name:employee.name,cpf:employee.cpf,role:employee.role}});
+ try{
+  const cpf=cleanCPF(req.body?.cpf);
+  const password=String(req.body?.password??"").trim();
+
+  if(cpf===ADMIN_CPF){
+   if(password!==ADMIN_PASSWORD){
+    return res.status(401).json({error:"Senha do administrador incorreta. Use os 8 primeiros dígitos do CPF."});
+   }
+   const a=db.prepare("SELECT id,name,cpf,role,active FROM employees WHERE cpf=?").get(ADMIN_CPF);
+   if(!a){
+    return res.status(500).json({error:"Administrador não inicializado. Reinicie o servidor para criar o acesso."});
+   }
+   const token=jwt.sign({id:a.id,name:a.name,cpf:a.cpf,role:"admin"},JWT_SECRET,{expiresIn:"12h"});
+   return res.json({token,user:{id:a.id,name:a.name,cpf:a.cpf,role:"admin"}});
+  }
+
+  if(!/^\d{11}$/.test(cpf)){
+   return res.status(401).json({error:"Informe um CPF com 11 dígitos."});
+  }
+  const employee=db.prepare("SELECT id,name,cpf,role,active FROM employees WHERE cpf=?").get(cpf);
+  if(!employee||!employee.active)return res.status(401).json({error:"CPF não cadastrado ou usuário inativo."});
+  if(password!==firstEight(cpf))return res.status(401).json({error:"Senha incorreta. A senha inicial são os 8 primeiros dígitos do CPF."});
+
+  const token=jwt.sign({id:employee.id,name:employee.name,cpf:employee.cpf,role:employee.role},JWT_SECRET,{expiresIn:"12h"});
+  res.json({token,user:{id:employee.id,name:employee.name,cpf:employee.cpf,role:employee.role}});
+ }catch(err){
+  console.error("Erro no login:",err);
+  res.status(500).json({error:"Não foi possível realizar o login. Tente novamente."});
+ }
 });
 
 app.get("/api/me",auth,(req,res)=>res.json(req.user));
