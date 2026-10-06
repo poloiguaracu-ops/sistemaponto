@@ -137,6 +137,7 @@ app.post("/api/login",(req,res)=>{
  }
 });
 
+app.get("/api/health",(req,res)=>res.json({ok:true,service:"sistemaponto",version:"2026-10-06-login"}));
 app.get("/api/me",auth,(req,res)=>res.json(req.user));
 app.get("/api/time",(req,res)=>res.json({now:nowBrasilia(),timeZone:"America/Sao_Paulo"}));
 
