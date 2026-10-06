@@ -47,6 +47,13 @@ CREATE INDEX IF NOT EXISTS idx_punches_employee_date ON punches(employee_id,reco
 CREATE INDEX IF NOT EXISTS idx_just_employee_date ON justifications(employee_id,date);
 `);
 
+const punchSchema=db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='punches'").get()?.sql||"";
+if(punchSchema.includes("CHECK(type IN ('registro'))")){
+ db.pragma("foreign_keys=OFF");
+ db.exec("ALTER TABLE punches RENAME TO punches_legacy; CREATE TABLE punches(id INTEGER PRIMARY KEY AUTOINCREMENT,employee_id INTEGER NOT NULL,type TEXT NOT NULL CHECK(type IN ('entrada','intervalo','retorno','saida')),recorded_at TEXT NOT NULL,ip TEXT,FOREIGN KEY(employee_id) REFERENCES employees(id)); INSERT INTO punches(id,employee_id,type,recorded_at,ip) SELECT id,employee_id,'entrada',recorded_at,ip FROM punches_legacy; DROP TABLE punches_legacy; CREATE INDEX IF NOT EXISTS idx_punches_employee_date ON punches(employee_id,recorded_at);");
+ db.pragma("foreign_keys=ON");
+}
+
 function nowBrasilia(){
  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(new Date());
  const o=Object.fromEntries(parts.map(p=>[p.type,p.value]));
