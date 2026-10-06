@@ -63,7 +63,13 @@ function cleanCPF(v){return String(v||"").replace(/\\D/g,"").slice(0,11)}
 function validCPF(v){return /^\\d{11}$/.test(v)}
 function firstEight(cpf){return cpf.slice(0,8)}
 
-const adminCPF="00000000000";
+const adminCPF="12584180960";
+const oldAdminCPF="00000000000";
+const targetAdmin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(adminCPF);
+const oldAdmin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(oldAdminCPF);
+if(!targetAdmin&&oldAdmin){
+ db.prepare("UPDATE employees SET cpf=?,role='admin',active=1 WHERE id=?").run(adminCPF,oldAdmin.id);
+}
 if(!db.prepare("SELECT id FROM employees WHERE cpf=?").get(adminCPF)){
  db.prepare("INSERT INTO employees(name,cpf,role,created_at) VALUES(?,?,?,?)").run("Administrador do Polo",adminCPF,"admin",nowBrasilia());
 }
