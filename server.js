@@ -59,19 +59,33 @@ function nowBrasilia(){
  const o=Object.fromEntries(parts.map(p=>[p.type,p.value]));
  return `${o.year}-${o.month}-${o.day} ${o.hour}:${o.minute}:${o.second}`;
 }
-function cleanCPF(v){return String(v||"").replace(/\\D/g,"").slice(0,11)}
-function validCPF(v){return /^\\d{11}$/.test(v)}
+function cleanCPF(v){return String(v||"").replace(/\D/g,"").slice(0,11)}
+function validCPF(v){
+ const cpf=String(v||"");
+ if(!/^\d{11}$/.test(cpf)||/^([0-9])\1{10}$/.test(cpf))return false;
+ let sum=0;
+ for(let i=0;i<9;i++)sum+=Number(cpf[i])*(10-i);
+ let d=(sum*10)%11;if(d===10)d=0;
+ if(d!==Number(cpf[9]))return false;
+ sum=0;
+ for(let i=0;i<10;i++)sum+=Number(cpf[i])*(11-i);
+ d=(sum*10)%11;if(d===10)d=0;
+ return d===Number(cpf[10]);
+}
 function firstEight(cpf){return cpf.slice(0,8)}
 
 const adminCPF="12584180960";
 const oldAdminCPF="00000000000";
-const targetAdmin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(adminCPF);
+let targetAdmin=db.prepare("SELECT id,role,active FROM employees WHERE cpf=?").get(adminCPF);
 const oldAdmin=db.prepare("SELECT id FROM employees WHERE cpf=?").get(oldAdminCPF);
 if(!targetAdmin&&oldAdmin){
  db.prepare("UPDATE employees SET cpf=?,role='admin',active=1 WHERE id=?").run(adminCPF,oldAdmin.id);
+ targetAdmin=db.prepare("SELECT id,role,active FROM employees WHERE cpf=?").get(adminCPF);
 }
-if(!db.prepare("SELECT id FROM employees WHERE cpf=?").get(adminCPF)){
- db.prepare("INSERT INTO employees(name,cpf,role,created_at) VALUES(?,?,?,?)").run("Administrador do Polo",adminCPF,"admin",nowBrasilia());
+if(!targetAdmin){
+ db.prepare("INSERT INTO employees(name,cpf,role,active,created_at) VALUES(?,?,?,?,?)").run("Administrador do Polo",adminCPF,1,nowBrasilia());
+}else{
+ db.prepare("UPDATE employees SET role='admin',active=1 WHERE id=?").run(targetAdmin.id);
 }
 
 app.use(express.json({limit:"8mb"}));
@@ -108,7 +122,15 @@ app.post("/api/punch",auth,(req,res)=>{
 
 app.get("/api/my-punches",auth,(req,res)=>{
  const date=String(req.query.date||nowBrasilia().slice(0,10));
- res.json(db.prepare("SELECT id,type,recorded_at FROM punches WHERE employee_id=? AND date(recorded_at)=date(?) ORDER BY recorded_at").all(req.user.id,date));
+ const punches=db.prepare("SELECT id,type,recorded_at FROM punches WHERE employee_id=? AND date(recorded_at)=date(?) ORDER BY recorded_at").all(req.user.id,date);
+ const mins=t=>{const m=String(t).match(/ (\d{2}):(\d{2}):/);return m?Number(m[1])*60+Number(m[2]):0};
+ let worked=0;
+ if(punches.length>=2)worked+=Math.max(0,mins(punches[1].recorded_at)-mins(punches[0].recorded_at));
+ if(punches.length>=4)worked+=Math.max(0,mins(punches[3].recorded_at)-mins(punches[2].recorded_at));
+ const target=480,bal=worked-target,abs=Math.abs(bal);
+ const fmt=n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(n%60).padStart(2,"0");
+ const next=["Entrada","Início do intervalo","Retorno do intervalo","Saída"][punches.length]||null;
+ res.json({punches,summary:{worked:fmt(worked),balance:fmt(abs),balanceSign:bal>=0?"+":"-"},nextLabel:next,nextType:next?["entrada","intervalo","retorno","saida"][punches.length]:null});
 });
 
 app.get("/api/my-justifications",auth,(req,res)=>{
@@ -159,5 +181,6 @@ app.get("/api/justifications/:id/document",auth,adminOnly,(req,res)=>{
  if(!m)return res.status(400).json({error:"Documento inválido."});
  res.setHeader("Content-Type",m[1]);res.setHeader("Content-Disposition",`inline; filename="${j.document_name||"documento"}"`);res.send(Buffer.from(m[2],"base64"));
 });
-app.get("*",(req,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+app.use((req,res,next)=>{if(req.method==="GET"&&req.accepts("html"))return res.sendFile(path.join(__dirname,"public","index.html"));next();});
+app.use((req,res)=>res.status(404).json({error:"Rota não encontrada."}));
 app.listen(PORT,()=>console.log("Sistema de ponto rodando na porta "+PORT));
