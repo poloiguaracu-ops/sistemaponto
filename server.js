@@ -84,9 +84,13 @@ app.get("/api/time",(req,res)=>res.json({now:nowBrasilia(),timeZone:"America/Sao
 
 app.post("/api/punch",auth,(req,res)=>{
  if(req.user.role==="admin")return res.status(400).json({error:"Use um cadastro de funcionário para registrar frequência."});
- const now=nowBrasilia();
- const result=db.prepare("INSERT INTO punches(employee_id,type,recorded_at,ip) VALUES(?,?,?,?)").run(req.user.id,"registro",now,req.ip);
- res.json({id:result.lastInsertRowid,recorded_at:now,message:"O seu registro foi aprovado e registrado com sucesso."});
+ const date=nowBrasilia().slice(0,10);
+ const rows=db.prepare("SELECT id,type,recorded_at FROM punches WHERE employee_id=? AND date(recorded_at)=date(?) ORDER BY recorded_at").all(req.user.id,date);
+ const types=["entrada","intervalo","retorno","saida"], labels={entrada:"Entrada",intervalo:"Início do intervalo",retorno:"Retorno do intervalo",saida:"Saída"};
+ if(rows.length>=4)return res.status(400).json({error:"Os quatro registros de hoje já foram realizados."});
+ const type=types[rows.length],now=nowBrasilia();
+ const result=db.prepare("INSERT INTO punches(employee_id,type,recorded_at,ip) VALUES(?,?,?,?)").run(req.user.id,type,now,req.ip);
+ res.json({id:result.lastInsertRowid,type,label:labels[type],recorded_at:now,message:"O seu registro foi aprovado: "+labels[type]+" registrado com sucesso."});
 });
 
 app.get("/api/my-punches",auth,(req,res)=>{
