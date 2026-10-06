@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS employees(
 CREATE TABLE IF NOT EXISTS punches(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
  employee_id INTEGER NOT NULL,
- type TEXT NOT NULL CHECK(type IN ('registro')),
+ type TEXT NOT NULL CHECK(type IN ('entrada','intervalo','retorno','saida')),
  recorded_at TEXT NOT NULL,
  ip TEXT,
  FOREIGN KEY(employee_id) REFERENCES employees(id)
