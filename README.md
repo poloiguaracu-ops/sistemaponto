@@ -1,31 +1,13 @@
-# Sistema de Ponto — Polo UniFil
+# Sistema de Registro de Frequência — Polo UniFil
 
-Sistema web para registrar entrada, início/fim de intervalo e saída dos funcionários.
+Acesso do funcionário por CPF e senha inicial formada pelos 8 primeiros dígitos do CPF. O funcionário vê relógio em horário de Brasília, REGISTRAR e JUSTIFICAR.
 
-Inclui login por matrícula e PIN, registro com data/hora do servidor, histórico diário, painel administrativo, cadastro de funcionários, relatório diário e interface responsiva.
+REGISTRAR grava imediatamente a frequência no banco e exibe confirmação. O registro aparece no relatório administrativo.
 
-## Rodar localmente
+JUSTIFICAR usa categorias inspiradas nas categorias publicadas pela Seed-PR: Formadores; atestados e declarações médicas (dia todo); atestados e declarações médicas (hora/período); aula cumprida fora da escola; escola fechada por motivo de força maior; justificativa administrativa; justificativa pessoal; sistema indisponível ou com falha; trabalho externo. O funcionário pode anexar PDF. A chefia analisa e aprova ou rejeita.
 
-Requer Node.js 20 ou superior.
+O sistema usa SQLite persistente em data/ponto.db. A hospedagem deve manter armazenamento persistente.
 
-Comandos:
+Antes de publicar, defina JWT_SECRET com chave longa e aleatória e use HTTPS. O CPF é dado pessoal e o acesso administrativo deve ser restrito.
 
-    npm install
-    npm start
-
-Depois abra http://localhost:3000
-
-## Primeiro acesso administrativo
-
-Matrícula: ADMIN
-PIN: 1234
-
-Troque esse PIN antes de colocar o sistema em produção.
-
-## Publicação
-
-A hospedagem precisa executar Node.js e manter o diretório data/ em armazenamento persistente. Se a hospedagem apagar o disco ao reiniciar, o banco não deve ser usado como armazenamento permanente sem um volume persistente.
-
-Configure também uma variável de ambiente forte chamada JWT_SECRET.
-
-Para uma implantação trabalhista definitiva, configure o fuso horário da hospedagem para America/Sao_Paulo e valide a política de ponto da empresa.
+O administrador técnico inicial usa CPF 00000000000. Altere esse cadastro/fluxo antes da produção.
