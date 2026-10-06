@@ -10,4 +10,6 @@ O sistema usa SQLite persistente em data/ponto.db. A hospedagem deve manter arma
 
 Antes de publicar, defina JWT_SECRET com chave longa e aleatória e use HTTPS. O CPF é dado pessoal e o acesso administrativo deve ser restrito.
 
-O administrador técnico inicial usa CPF 00000000000. Altere esse cadastro/fluxo antes da produção.
+O administrador técnico inicial usa o CPF configurado no servidor. Atualmente: 12584180960. A senha inicial é formada pelos 8 primeiros dígitos: 12584180.
+
+Importante: após alterações no GitHub, a hospedagem Node precisa fazer novo deploy/restart para executar a migração do banco. GitHub Pages não executa `server.js` nem SQLite; use uma hospedagem Node com armazenamento persistente.
